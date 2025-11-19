@@ -1,10 +1,11 @@
-git+https://github.com/unclecode/crawl4ai.git@dev
+git+https://github.com/unclecode/crawl4ai.git@next
 fastapi
 uvicorn
 python-dotenv
 pydantic
 requests
 playwright
+
 
 
 
