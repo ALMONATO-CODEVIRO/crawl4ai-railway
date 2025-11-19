@@ -1,8 +1,9 @@
 import os
+import asyncio
 from fastapi import FastAPI
 from pydantic import BaseModel
 from crawl4ai import AsyncWebCrawler
-from crawl4ai.extractors.llm_extractor import LLMExtractor
+from crawl4ai.extractors.llm import LLMExtractor
 
 app = FastAPI()
 
@@ -25,12 +26,11 @@ class ExtractRequest(BaseModel):
         "disponibilidad": ""
     }
     """
-
+    
 class ExtractResponse(BaseModel):
     success: bool
     data: dict
     raw_text: str
-
 
 # ======================
 # ROUTE /extract
@@ -40,12 +40,11 @@ class ExtractResponse(BaseModel):
 async def extract(request: ExtractRequest):
     crawler = AsyncWebCrawler()
 
-    # Iniciar navegador (headless Chromium)
+    # Iniciar navegador
     await crawler.start()
 
-    # LLMExtractor
     extractor = LLMExtractor(
-        llm_provider="openai/gpt-4.1-mini",  # Puedes cambiar el modelo
+        llm_provider="openai/gpt-4.1-mini",
         llm_api_key=os.getenv("OPENAI_API_KEY"),
         extraction_prompt=request.query
     )
@@ -54,9 +53,9 @@ async def extract(request: ExtractRequest):
     result = await crawler.extract(
         url=request.url,
         extractor=extractor,
-        wait_for=2000,            # espera para cargar la página
-        screenshot=True,          # útil para debugging
-        js=False                  # No forzar JS a menos que sea necesario
+        wait_for=2000,
+        screenshot=True,
+        js=False
     )
 
     await crawler.close()
@@ -66,4 +65,5 @@ async def extract(request: ExtractRequest):
         data=result.extracted_content,
         raw_text=result.markdown
     )
+
 
