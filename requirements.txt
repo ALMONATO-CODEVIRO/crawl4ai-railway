@@ -4,6 +4,7 @@ crawl4ai
 python-dotenv
 pydantic
 requests
+playwright
 
 
 
