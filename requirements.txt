@@ -5,6 +5,7 @@ python-dotenv
 pydantic
 requests
 playwright
+markdownify
 
 
 
