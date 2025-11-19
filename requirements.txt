@@ -1,8 +1,9 @@
-git+https://github.com/unclecode/crawl4ai.git@advanced
+git+https://github.com/unclecode/crawl4ai.git@feature/async-llm-extaction
 fastapi
 uvicorn
 playwright
 requests
+
 
 
 
