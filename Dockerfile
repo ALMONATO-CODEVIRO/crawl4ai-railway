@@ -3,13 +3,13 @@ FROM python:3.11-slim
 # 1. Directorio de trabajo
 WORKDIR /app
 
-# 2. Instalar dependencias del sistema para Playwright
-RUN apt-get update && \
-    apt-get install -y wget gnupg ca-certificates fonts-liberation libatk1.0-0 \
+# 2. Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    git wget gnupg ca-certificates fonts-liberation libatk1.0-0 \
     libnss3 libx11-6 libxcomposite1 libxdamage1 libxext6 libxfixes3 \
-    libxrandr2 libxrender1 libxss1 libxtst6 libdrm2 libgbm1 libpango-1.0-0 \
-    libcairo2 libasound2 && \
-    rm -rf /var/lib/apt/lists/*
+    libxrandr2 libxrender1 libxslt libdrm2 libgbm1 libpangox-1.0-0 \
+    libcairo2 libasound2 \
+    && rm -rf /var/lib/apt/lists/*
 
 # 3. Copiar requirements e instalarlos
 COPY requirements.txt .
@@ -26,4 +26,3 @@ ENV PORT=8000
 
 # 7. Comando de arranque
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-
