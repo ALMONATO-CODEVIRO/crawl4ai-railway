@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from crawl4ai import Crawl4Ai   # API correcta
+from crawl4ai import AsyncWebCrawler
 
 app = FastAPI()
 
@@ -9,10 +9,10 @@ def root():
     return {"status": "ok", "message": "Crawl4AI service running"}
 
 @app.get("/crawl")
-async def crawl_url(url: str = Query(..., description="URL a extraer")):
+async def crawl_url(url: str):
     try:
-        crawler = Crawl4Ai()
-        result = crawler.run(url)
+        crawler = AsyncWebCrawler()
+        result = await crawler.run(url)
 
         return {
             "url": url,
