@@ -1,4 +1,5 @@
 fastapi
 uvicorn[standard]
+crawl4ai==0.3.8
 playwright
-git+https://github.com/unclecode/crawl4ai.git
+
