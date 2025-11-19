@@ -1,100 +1,40 @@
-import os
-import json
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from crawl4ai import AsyncWebCrawler
-from crawl4ai.extraction_strategy import LLMExtractionStrategy
-import os, json
+from crawl4ai import run_crawl
+import os
+from dotenv import load_dotenv
 
+# Carga las variables de entorno
+load_dotenv()
+
+# Inicializa la app
 app = FastAPI()
 
-# ---------- HEALTHCHECK ----------
+# Modelos de entrada y salida
+class CrawlInput(BaseModel):
+    text: str
+
+class CrawlOutput(BaseModel):
+    metadata: dict
+    sections: list
+
+# Endpoint de prueba
 @app.get("/")
-async def root():
-    return {"status": "ok", "message": "FastAPI en Railway está vivo 🚀"}
+def root():
+    return {"status": "ok", "message": "FastAPI + crawl4ai activo"}
 
-# ======================
-# MODELO REQUEST/RESPONSE
-# ======================
-
-class ExtractRequest(BaseModel):
-    url: str
-    query: str = """
-    Extrae SOLO esta información del producto y respóndela en JSON:
-    {
-        "nombre": "",
-        "precio": "",
-        "precio_anterior": "",
-        "sku": "",
-        "marca": "",
-        "descripcion": "",
-        "imagen": "",
-        "disponibilidad": ""
-    }
-    """
-
-class ExtractResponse(BaseModel):
-    success: bool
-    data: dict
-    raw_text: str
-
-
-# ======================
-# ROUTE /extract
-# ======================
-
-@app.post("/extract", response_model=ExtractResponse)
-async def extract(request: ExtractRequest):
-    # Comprobamos que la API key existe
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return ExtractResponse(
-            success=False,
-            data={"error": "OPENAI_API_KEY no está configurada dentro del contenedor"},
-            raw_text=""
-        )
-
-    # Estrategia LLM de crawl4ai
-    llm_strategy = LLMExtractionStrategy(
-        provider="openai/gpt-4.1-mini",   # si falla, luego probamos con otro nombre
-        api_token=api_key,
-        instruction=request.query,
-        extraction_type="json",
-        apply_chunking=False,
-    )
-
+# Endpoint principal
+@app.post("/crawl", response_model=CrawlOutput)
+def crawl_endpoint(data: CrawlInput):
     try:
-        async with AsyncWebCrawler() as crawler:
-            result = await crawler.arun(
-                url=request.url,
-                extraction_strategy=llm_strategy,
-                screenshot=False,
-            )
-    except Exception as e:
-        # para evitar que el servidor se caiga y Railway devuelva 502
-        return ExtractResponse(
-            success=False,
-            data={"error": str(e)},
-            raw_text=""
+        result = run_crawl(
+            text=data.text,
+            metadata={"source": "railway"},
+            strategy=os.getenv("CRAWL_STRATEGY", "default")
         )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    data = {}
-    if result.extracted_content:
-        try:
-            data = json.loads(result.extracted_content)
-        except Exception:
-            data = {"raw": result.extracted_content}
-
-    raw_text = ""
-    if hasattr(result, "markdown_v2") and result.markdown_v2:
-        raw_text = result.markdown_v2.raw_markdown or ""
-    elif hasattr(result, "markdown") and result.markdown:
-        raw_text = result.markdown
-
-    return ExtractResponse(
-        success=result.success,
-        data=data,
-        raw_text=raw_text,
-    )
 
 
