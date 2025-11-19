@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import List, Optional
 from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
 from markdownify import markdownify as md
@@ -19,10 +20,16 @@ class URLRequest(BaseModel):
     url: str
     wait_until: str = "domcontentloaded"  # 'load', 'domcontentloaded', 'networkidle'
 
+class SelectorItem(BaseModel):
+    label: Optional[str] = None  # Puedes dejarlo sin usar si no te interesa
+    selector: str
+    attr: Optional[str] = None   # Si quieres extraer 'src', 'href', etc.
+    select_all: Optional[bool] = False  # Para futuro uso: múltiples elementos
+
 class SelectorRequest(BaseModel):
     url: str
-    selectors: list[str]
-    wait_until: str = "domcontentloaded"
+    wait_until: Optional[str] = "load"
+    selectors: List[SelectorItem]
 
 # 🔍 /CRAWL – Devuelve HTML y Markdown
 @app.post("/crawl")
@@ -85,12 +92,17 @@ async def selectors(request: SelectorRequest):
         soup = BeautifulSoup(content, "html.parser")
         results = {}
 
-        for selector in request.selectors:
-            element = soup.select_one(selector)
-            if element:
-                results[selector] = element.get_text(strip=True)
+        for item in request.selectors:
+            label = item.label or item.selector
+            selected_element = soup.select_one(item.selector)
+
+            if selected_element:
+                if item.attr:
+                    results[label] = selected_element.get(item.attr, "")
+                else:
+                    results[label] = selected_element.get_text(strip=True)
             else:
-                results[selector] = ""
+                results[label] = ""
 
         return {
             "url": request.url,
