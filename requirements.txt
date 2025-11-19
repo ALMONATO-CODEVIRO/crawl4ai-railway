@@ -1,6 +1,9 @@
 fastapi
 uvicorn[standard]
-crawl4ai==0.4.5
+aiohttp
+beautifulsoup4
 playwright
+git+https://github.com/unclecode/crawl4ai.git
+
 
 
