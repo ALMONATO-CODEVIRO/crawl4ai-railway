@@ -71,6 +71,7 @@ async def screenshot(request: URLRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # 🧪 /SELECTORS – Extrae texto desde selectores CSS
+# 🧪 /SELECTORS – Extrae texto desde selectores CSS (versión funcional universal)
 @app.post("/selectors")
 async def selectors(request: SelectorRequest):
     try:
@@ -82,20 +83,14 @@ async def selectors(request: SelectorRequest):
             await browser.close()
 
         soup = BeautifulSoup(content, "html.parser")
-
         results = {}
 
-        for label in request.selectors:
-            found = False
-            for item in soup.select(".item"):
-                title = item.select_one(".title")
-                description = item.select_one(".description")
-                if title and description and label.lower() in title.text.lower():
-                    results[label] = description.get_text(strip=True)
-                    found = True
-                    break
-            if not found:
-                results[label] = ""  # o None si prefieres
+        for selector in request.selectors:
+            element = soup.select_one(selector)
+            if element:
+                results[selector] = element.get_text(strip=True)
+            else:
+                results[selector] = ""
 
         return {
             "url": request.url,
@@ -104,6 +99,7 @@ async def selectors(request: SelectorRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 
