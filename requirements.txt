@@ -1,7 +1,10 @@
+git+https://github.com/unclecode/crawl4ai.git@advanced
 fastapi
 uvicorn
 playwright
-git+https://github.com/unclecode/crawl4ai.git@main
+requests
+
+
 
 
 
