@@ -1,46 +1,42 @@
-FROM python:3.11-slim
+FROM ubuntu:22.04
 
-# 1. Directorio de trabajo
-WORKDIR /app
+# Evitar preguntas interactivas
+ENV DEBIAN_FRONTEND=noninteractive
 
-# 2. Instalar dependencias necesarias para Playwright
+# 1. Instalar Python y dependencias básicas
 RUN apt-get update && apt-get install -y \
-    git \
-    wget \
-    gnupg \
-    ca-certificates \
-    fonts-liberation \
-    libatk1.0-0 \
-    libnss3 \
-    libx11-6 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    libxrender1 \
-    libxcb1 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgbm1 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libcairo2 \
-    libasound2 \
+    python3 python3-pip python3-venv python3-dev \
+    git wget curl unzip \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 3. Copiar requirements e instalarlos
+# 2. Instalar dependencias del sistema necesarias para Playwright
+RUN apt-get update && apt-get install -y \
+    libnss3 libatk1.0-0 libatk-bridge2.0-0 \
+    libcups2 libxkbcommon0 libxcomposite1 libxrandr2 \
+    libxdamage1 libxfixes3 libpango-1.0-0 libpangocairo-1.0-0 \
+    libcairo2 libasound2 libxshmfence1 libgbm1 \
+    libx11-6 libx11-xcb1 libxcb1 libxcursor1 libxi6 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 3. Directorio de trabajo
+WORKDIR /app
+
+# 4. Copiar e instalar requerimientos
 COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 4. Instalar navegadores Playwright
-RUN playwright install --with-deps
+# 5. Instalar Playwright + navegadores
+RUN playwright install
+RUN playwright install-deps
 
-# 5. Copiar el proyecto
+# 6. Copiar código
 COPY . .
 
-# 6. Puerto
+# 7. Exponer puerto
 ENV PORT=8000
 
-# 7. Ejecutar FastAPI con Uvicorn
+# 8. Ejecutar API
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
