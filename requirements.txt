@@ -1,9 +1,8 @@
 fastapi
-uvicorn[standard]
-aiohttp
-beautifulsoup4
+uvicorn
 playwright
-git+https://github.com/unclecode/crawl4ai.git
+git+https://github.com/unclecode/crawl4ai.git@main
+
 
 
 
