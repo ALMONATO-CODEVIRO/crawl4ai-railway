@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from crawl4ai import AsyncWebCrawler
-from crawl4ai.extractors.llm_extractor import LLMExtractor
+from crawl4ai import LLMExtractor
 
 app = FastAPI()
 

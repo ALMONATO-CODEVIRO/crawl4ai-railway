@@ -1,8 +1,11 @@
-git+https://github.com/unclecode/crawl4ai.git@feature/async-llm-extaction
+git+https://github.com/unclecode/crawl4ai.git@dev
 fastapi
 uvicorn
-playwright
+python-dotenv
+pydantic
 requests
+playwright
+
 
 
 

@@ -15,8 +15,8 @@ WORKDIR /app
 # 2. Requisitos Python
 COPY requirements.txt .
 
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 3. Instalar Playwright y Chromium
 RUN playwright install-deps
