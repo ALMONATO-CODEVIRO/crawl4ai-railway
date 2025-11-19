@@ -1,9 +1,12 @@
-git+https://github.com/unclecode/crawl4ai.git@next
+crawl4ai
 fastapi
 uvicorn
 python-dotenv
 pydantic
 requests
+
+
+
 
 
 
