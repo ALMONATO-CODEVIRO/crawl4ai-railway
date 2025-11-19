@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-crawl4ai
+crawl4ai==0.4.5
 playwright
 
 
