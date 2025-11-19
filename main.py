@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from crawl4ai import AsyncWebCrawler, LLMExtractor
+from crawl4ai import AsyncWebCrawler
+from crawl4ai.extractors.llm_extractor import LLMExtractor
 
 app = FastAPI()
 
@@ -8,25 +9,18 @@ app = FastAPI()
 def root():
     return {"status": "ok", "message": "Crawl4AI service running"}
 
-@app.post("/extract-product")
-async def extract_product(payload: dict):
-    url = payload.get("url")
-
+@app.get("/crawl")
+async def crawl_url(url: str):
     try:
-        extractor = LLMExtractor(
-            model="gpt-4o-mini",
-            schema={
-                "title": "string",
-                "price": "string",
-                "images": ["string"],
-                "description": "string",
-            }
-        )
-
         crawler = AsyncWebCrawler()
+        extractor = LLMExtractor()
+
         result = await crawler.run(url, extractor=extractor)
 
-        return result.data
+        return {
+            "url": url,
+            "content": result.markdown if hasattr(result, "markdown") else str(result)
+        }
 
     except Exception as e:
         return JSONResponse(
