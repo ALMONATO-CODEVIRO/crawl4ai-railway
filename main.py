@@ -1,72 +1,93 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from crawl4ai import AsyncWebCrawler
-from dotenv import load_dotenv
-from playwright.async_api import async_playwright
+from fastapi.responses import JSONResponse
+from bs4 import BeautifulSoup
+from markdownify import markdownify as md
 import base64
-import asyncio
+from playwright.async_api import async_playwright
 
-# Cargar variables desde .env
-load_dotenv()
-
-# Iniciar la aplicación FastAPI
 app = FastAPI()
 
-# Modelos
-class CrawlInput(BaseModel):
+# 📥 MODELO DE ENTRADA
+class URLRequest(BaseModel):
     url: str
+    wait_until: str = "domcontentloaded"  # 'load', 'domcontentloaded', 'networkidle'
 
-class ScreenshotRequest(BaseModel):
+class SelectorRequest(BaseModel):
     url: str
+    selectors: list[str]
+    wait_until: str = "domcontentloaded"
 
-class CrawlOutput(BaseModel):
-    markdown: str
-    html: str
-    metadata: dict
-
-@app.get("/")
-def root():
-    return {"status": "ok", "message": "FastAPI activo"}
-
-# 📸 Screenshot en base64 PNG
-@app.post("/screenshot")
-async def screenshot(request: ScreenshotRequest):
+# 🔍 /CRAWL – Devuelve HTML y Markdown
+@app.post("/crawl")
+async def crawl(request: URLRequest):
     try:
         async with async_playwright() as p:
-            browser = await p.chromium.launch()
+            browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
-            await page.goto(request.url, wait_until="networkidle")
-            screenshot_bytes = await page.screenshot(full_page=True, type="png")
+            await page.goto(request.url, wait_until=request.wait_until, timeout=60000)
+            content = await page.content()
             await browser.close()
 
-        screenshot_base64 = base64.b64encode(screenshot_bytes).decode("utf-8")
+        # Parse con BeautifulSoup y Markdown
+        soup = BeautifulSoup(content, "html.parser")
+        main = soup.find("main") or soup.body or soup
+        html = str(main)
+        markdown = md(html)
 
         return {
-            "image_base64": screenshot_base64,
+            "url": request.url,
+            "markdown": markdown,
+            "html": html
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 📸 /SCREENSHOT – Devuelve imagen base64 en PNG
+@app.post("/screenshot")
+async def screenshot(request: URLRequest):
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.goto(request.url, wait_until=request.wait_until, timeout=60000)
+            image = await page.screenshot(full_page=True, type="png")
+            await browser.close()
+
+        return {
+            "image_base64": base64.b64encode(image).decode("utf-8"),
             "content_type": "image/png"
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🌐 Crawl con Crawl4AI
-@app.post("/crawl", response_model=CrawlOutput)
-def crawl_endpoint(data: CrawlInput):
+# 🧪 /SELECTORS – Extrae texto desde selectores CSS
+@app.post("/selectors")
+async def selectors(request: SelectorRequest):
     try:
-        result = asyncio.run(crawl_url(data.url))
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.goto(request.url, wait_until=request.wait_until, timeout=60000)
+            content = await page.content()
+            await browser.close()
+
+        soup = BeautifulSoup(content, "html.parser")
+
+        results = {}
+        for selector in request.selectors:
+            elements = soup.select(selector)
+            results[selector] = [el.get_text(strip=True) for el in elements]
+
         return {
-            "markdown": result.markdown,
-            "html": result.html,
-            "metadata": result.metadata
+            "url": request.url,
+            "results": results
         }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# Función auxiliar para Crawl4AI
-async def crawl_url(url: str):
-    async with AsyncWebCrawler() as crawler:
-        result = await crawler.arun(url=url)
-    return result
 
 
 
