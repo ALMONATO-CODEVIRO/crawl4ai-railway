@@ -1,28 +1,39 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from crawl4ai import AsyncWebCrawler
+from crawl4ai import AsyncWebCrawler, LLMExtractor
+import json
 
-app = FastAPI()
-
-class CrawlRequest(BaseModel):
+class ProductRequest(BaseModel):
     url: str
 
-@app.get("/")
-def root():
-    return {"status": "ok", "message": "Crawl4AI service running"}
-
-@app.post("/crawl")
-async def crawl_url(req: CrawlRequest):
+@app.post("/extract-product")
+async def extract_product(req: ProductRequest):
     try:
         async with AsyncWebCrawler() as crawler:
-            result = await crawler.arun(url=req.url)
+            result = await crawler.arun(
+                url=req.url,
+                extractors=[
+                    LLMExtractor(
+                        schema={
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "price": {"type": "string"},
+                                "description": {"type": "string"}
+                            },
+                            "required": ["name", "price"]
+                        },
+                        llm="openai:gpt-4o-mini"
+                    )
+                ]
+            )
+
+        data = json.loads(result.extracted_content)
 
         return {
             "url": req.url,
-            "html": result.html,
-            "markdown": result.markdown,
-            "metadata": result.metadata
+            "product": data
         }
 
     except Exception as e:
