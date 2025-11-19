@@ -1,40 +1,45 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from crawl4ai.core import run_crawl
-import os
+from crawl4ai import AsyncWebCrawler
 from dotenv import load_dotenv
+import asyncio
 
-# Carga las variables de entorno
+# Carga variables desde .env (si lo necesitas)
 load_dotenv()
 
-# Inicializa la app
+# Inicia la app FastAPI
 app = FastAPI()
 
-# Modelos de entrada y salida
+# Modelo de entrada (una URL)
 class CrawlInput(BaseModel):
-    text: str
+    url: str
 
+# Modelo de salida (lo que devolveremos al cliente)
 class CrawlOutput(BaseModel):
+    markdown: str
     metadata: dict
-    sections: list
 
-# Endpoint de prueba
 @app.get("/")
 def root():
-    return {"status": "ok", "message": "FastAPI + crawl4ai activo"}
+    return {"status": "ok", "message": "FastAPI + Crawl4AI activo"}
 
-# Endpoint principal
 @app.post("/crawl", response_model=CrawlOutput)
 def crawl_endpoint(data: CrawlInput):
     try:
-        result = run_crawl(
-            text=data.text,
-            metadata={"source": "railway"},
-            strategy=os.getenv("CRAWL_STRATEGY", "default")
-        )
-        return result
+        result = asyncio.run(crawl_url(data.url))
+        return {
+            "markdown": result.markdown,
+            "metadata": result.metadata
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Función principal que llama a Crawl4AI de forma asíncrona
+async def crawl_url(url: str):
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(url=url)
+    return result
+
 
 
 
