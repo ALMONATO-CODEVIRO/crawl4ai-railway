@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from crawl4ai import run_crawl
+from crawl4ai.core import run_crawl
 import os
 from dotenv import load_dotenv
 
