@@ -5,8 +5,14 @@ from bs4 import BeautifulSoup
 from markdownify import markdownify as md
 import base64
 from playwright.async_api import async_playwright
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 app = FastAPI()
+
+openai_api_key = os.getenv("OPENAI_API_KEY")
 
 # 📥 MODELO DE ENTRADA
 class URLRequest(BaseModel):
@@ -38,7 +44,8 @@ async def crawl(request: URLRequest):
         return {
             "url": request.url,
             "markdown": markdown,
-            "html": html
+            "html": html,
+            "metadata": metadata
         }
 
     except Exception as e:
@@ -77,9 +84,18 @@ async def selectors(request: SelectorRequest):
         soup = BeautifulSoup(content, "html.parser")
 
         results = {}
-        for selector in request.selectors:
-            elements = soup.select(selector)
-            results[selector] = [el.get_text(strip=True) for el in elements]
+
+        for label in request.selectors:
+            found = False
+            for item in soup.select(".item"):
+                title = item.select_one(".title")
+                description = item.select_one(".description")
+                if title and description and label.lower() in title.text.lower():
+                    results[label] = description.get_text(strip=True)
+                    found = True
+                    break
+            if not found:
+                results[label] = ""  # o None si prefieres
 
         return {
             "url": request.url,
@@ -88,6 +104,7 @@ async def selectors(request: SelectorRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 
