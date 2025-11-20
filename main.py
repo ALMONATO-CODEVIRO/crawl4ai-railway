@@ -50,8 +50,7 @@ async def crawl(request: URLRequest):
         return {
             "url": request.url,
             "markdown": markdown,
-            "html": html,
-            "metadata": metadata
+            "html": html
         }
 
     except Exception as e:
@@ -63,12 +62,18 @@ async def screenshot(request: URLRequest):
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
+            page = await context.new_page()
 
-            await page.goto(request.url, wait_until="networkidle", timeout=60000)
+            try:
+                await page.goto(request.url, wait_until="domcontentloaded", timeout=60000)
+            except Exception as e:
+                raise HTTPException(status_code=504, detail=f"Error en carga de la página: {str(e)}")
 
-            # Espera explícita a que se cargue el contenido que deseas capturar
-            await page.wait_for_selector("span.box__price--current", timeout=15000)
+            try:
+                await page.wait_for_selector("span.box__price--current", timeout=15000)
+            except:
+                pass  # No rompas si no encuentra el selector, igual toma screenshot
 
             image = await page.screenshot(full_page=True, type="png")
             await browser.close()
@@ -79,7 +84,7 @@ async def screenshot(request: URLRequest):
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Fallo general: {str(e)}")
 
 # 🧪 /SELECTORS – Extrae texto desde selectores CSS
 # 🧪 /SELECTORS – Extrae texto desde selectores CSS (versión funcional universal)
