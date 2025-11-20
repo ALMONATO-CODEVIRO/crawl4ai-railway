@@ -16,19 +16,15 @@ app = FastAPI()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
 # 📥 MODELO DE ENTRADA
-class URLRequest(BaseModel):
-    url: str
-    wait_until: str = "domcontentloaded"  # 'load', 'domcontentloaded', 'networkidle'
 
 class SelectorItem(BaseModel):
-    label: Optional[str] = None  # Puedes dejarlo sin usar si no te interesa
     selector: str
-    attr: Optional[str] = None   # Si quieres extraer 'src', 'href', etc.
-    select_all: Optional[bool] = False  # Para futuro uso: múltiples elementos
+    label: Optional[str] = None
+    attr: Optional[str] = None
 
 class SelectorRequest(BaseModel):
     url: str
-    wait_until: Optional[str] = "load"
+    wait_until: Optional[str] = "networkidle"
     selectors: List[SelectorItem]
 
 # 🔍 /CRAWL – Devuelve HTML y Markdown
@@ -65,7 +61,12 @@ async def screenshot(request: URLRequest):
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
-            await page.goto(request.url, wait_until=request.wait_until, timeout=60000)
+
+            await page.goto(request.url, wait_until="networkidle", timeout=60000)
+
+            # Espera explícita a que se cargue el contenido que deseas capturar
+            await page.wait_for_selector("span.box__price--current", timeout=15000)
+
             image = await page.screenshot(full_page=True, type="png")
             await browser.close()
 
