@@ -131,6 +131,60 @@ async def selectors(request: SelectorRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class MultiURLRequest(BaseModel):
+    urls: List[str]
+
+@app.post("/precios")
+async def obtener_precios(request: MultiURLRequest):
+    resultados = []
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+
+        for url in request.urls:
+            dominio = url.lower()
+            resultado = {"url": url}
+
+            try:
+                await page.goto(url, wait_until="networkidle", timeout=60000)
+                content = await page.content()
+                soup = BeautifulSoup(content, "html.parser")
+
+                # ✅ Cruz Verde
+                if "cruzverde.com.co" in dominio:
+                    precio_actual_cruzverde = soup.select_one("span.font-bold.text-primary")
+                    precio_anterior_cruzverde = soup.select_one("div.line-through.order-3.ng-star-inserted")
+                    resultado["precio_actual_cruzverde"] = precio_actual_cruzverde.get_text(strip=True) if precio_actual_cruzverde else ""
+                    resultado["precio_anterior_cruzverde"] = precio_anterior_cruzverde.get_text(strip=True) if precio_anterior_cruzverde else ""
+
+                # ✅ Farmatodo
+                elif "farmatodo.com.co" in dominio:
+                    precio_actual_farmatodo = soup.select_one("span.box__price--current")
+                    precio_anterior_farmatodo = soup.select_one("span.box__price--before")
+                    resultado["precio_actual_farmatodo"] = precio_actual_farmatodo.get_text(strip=True) if precio_actual_farmatodo else ""
+                    resultado["precio_anterior_farmatodo"] = precio_anterior_farmatodo.get_text(strip=True) if precio_anterior_farmatodo else ""
+
+                # ✅ Droguería Alemana
+                elif "tudrogueriavirtual.com" in dominio:
+                    precio_actual_drogueriaalemana = soup.select_one("span.vtex-store-components-3-x-sellingPriceValue")
+                    precio_anterior_drogueriaalemana = soup.select_one("span.vtex-store-components-3-x-listPriceValue")
+                    resultado["precio_actual_drogueriaalemana"] = precio_actual_drogueriaalemana.get_text(strip=True) if precio_actual_drogueriaalemana else ""
+                    resultado["precio_anterior_drogueriaalemana"] = precio_anterior_drogueriaalemana.get_text(strip=True) if precio_anterior_drogueriaalemana else ""
+
+                else:
+                    resultado["error"] = "Dominio no soportado aún."
+
+            except Exception as e:
+                resultado["error"] = str(e)
+
+            resultados.append(resultado)
+
+        await browser.close()
+
+    return {"resultados": resultados}
+
+
 
 
 
