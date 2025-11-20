@@ -86,6 +86,15 @@ async def selectors(request: SelectorRequest):
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
             await page.goto(request.url, wait_until=request.wait_until, timeout=60000)
+
+            # ✅ Esperar a que cada selector esté presente antes de capturar el contenido
+            for item in request.selectors:
+                try:
+                    await page.wait_for_selector(item.selector, timeout=15000)
+                except Exception:
+                    # Si no aparece, continuamos sin romper todo
+                    pass
+
             content = await page.content()
             await browser.close()
 
@@ -111,6 +120,7 @@ async def selectors(request: SelectorRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 
