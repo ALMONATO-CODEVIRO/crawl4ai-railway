@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 from typing import List, Optional, Union    
 from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
@@ -31,8 +31,8 @@ class SelectorRequest(BaseModel):
     wait_until: Optional[str] = "networkidle"
     selectors: List[SelectorItem]
 
-class PreciosRequest(BaseModel):
-    __root__: Union[SelectorRequest, List[SelectorRequest]]
+class PreciosRequest(RootModel[Union[SelectorRequest, List[SelectorRequest]]]):
+    pass
 
 # 🔍 /CRAWL – Devuelve HTML y Markdown
 @app.post("/crawl")
@@ -139,24 +139,23 @@ async def extract_selectors(request: SelectorRequest):
 
 @app.post("/precios")
 async def precios(request: PreciosRequest):
-    data = request.__root__
+    data = request.root
 
-    # Si es un solo bloque
+    # 🔹 Si es un solo bloque
     if isinstance(data, SelectorRequest):
         return await extract_selectors(data)
 
-    # Si son varios bloques
+    # 🔹 Si es una lista de bloques
     elif isinstance(data, list):
         results = []
-
         for block in data:
             result = await extract_selectors(block)
             results.append(result)
-
         return results
 
     else:
         raise HTTPException(status_code=400, detail="Formato inválido para /precios")
+
 
 
 class MultiURLRequest(BaseModel):
