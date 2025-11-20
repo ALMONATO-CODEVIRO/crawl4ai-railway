@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Union    
 from fastapi.responses import JSONResponse
 from bs4 import BeautifulSoup
 from markdownify import markdownify as md
@@ -30,6 +30,9 @@ class SelectorRequest(BaseModel):
     url: str
     wait_until: Optional[str] = "networkidle"
     selectors: List[SelectorItem]
+
+class PreciosRequest(BaseModel):
+    __root__: Union[SelectorRequest, List[SelectorRequest]]
 
 # 🔍 /CRAWL – Devuelve HTML y Markdown
 @app.post("/crawl")
@@ -135,40 +138,26 @@ async def extract_selectors(request: SelectorRequest):
 
 
 @app.post("/precios")
-async def precios(request: URLRequest):
-    url = request.url
+async def precios(request: PreciosRequest):
+    data = request.__root__
 
-    if not url:
-        raise HTTPException(status_code=400, detail="La URL es requerida")
+    # Si es un solo bloque
+    if isinstance(data, SelectorRequest):
+        return await extract_selectors(data)
 
-    # 🌐 Detectar tienda según dominio y definir selectores
-    if "farmatodo" in url:
-        selectors = [
-            SelectorItem(label="precio_actual", selector="span.box__price--current"),
-            SelectorItem(label="precio_anterior", selector="span.box__price--before"),
-        ]
-    elif "cruzverde" in url:
-        selectors = [
-            SelectorItem(label="precio_actual", selector="span.font-bold.text-primary"),
-            SelectorItem(label="precio_anterior", selector="span.line-through.text-gray-500"),
-        ]
-    elif "tudrogueriavirtual" in url:
-        selectors = [
-            SelectorItem(label="precio_actual", selector="span.product-price"),
-            SelectorItem(label="precio_anterior", selector="span.old-price"),
-        ]
+    # Si son varios bloques
+    elif isinstance(data, list):
+        results = []
+
+        for block in data:
+            result = await extract_selectors(block)
+            results.append(result)
+
+        return results
+
     else:
-        raise HTTPException(status_code=400, detail="Tienda no soportada")
+        raise HTTPException(status_code=400, detail="Formato inválido para /precios")
 
-    # 🧪 Reutilizar la lógica del endpoint /selectors
-    selector_request = SelectorRequest(
-        url=url,
-        wait_until="networkidle",
-        selectors=selectors
-    )
-
-    return await extract_selectors(selector_request)
-    
 
 class MultiURLRequest(BaseModel):
     urls: List[str]
