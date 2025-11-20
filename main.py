@@ -7,6 +7,7 @@ from markdownify import markdownify as md
 import base64
 from playwright.async_api import async_playwright
 from dotenv import load_dotenv
+from fastapi import Request
 import os
 
 load_dotenv()
@@ -36,6 +37,7 @@ async def crawl(request: URLRequest):
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
             page = await browser.new_page()
             await page.goto(request.url, wait_until=request.wait_until, timeout=60000)
             content = await page.content()
@@ -87,74 +89,89 @@ async def screenshot(request: URLRequest):
         raise HTTPException(status_code=500, detail=f"Fallo general: {str(e)}")
 
 # 🧪 /SELECTORS – Extrae texto desde selectores CSS
-
-@app.post("/precios")
-async def precios(request: Request):
-    body = await request.json()
-    url = body.get("url")
-
-    if not url:
-        raise HTTPException(status_code=400, detail="La URL es requerida")
-
-    # 🌐 Detectar tienda según dominio
-    if "farmatodo" in url:
-        selectors = [
-            {"label": "precio_actual", "selector": "span.box__price--current"},
-            {"label": "precio_anterior", "selector": "span.box__price--before"},
-        ]
-    elif "cruzverde" in url:
-        selectors = [
-            {"label": "precio_actual", "selector": "span.font-bold.text-prices"},
-            {"label": "precio_anterior", "selector": "div.line-through.order-3.ng-star-inserted"},
-        ]
-    elif "tudrogueriavirtual" in url:
-        selectors = [
-            {"label": "precio_actual", "selector": "span.vtex-store-components-3-x-sellingPriceValue"},
-            {"label": "precio_anterior", "selector": "span.vtex-store-components-3-x-listPriceValue"},
-        ]
-    else:
-        raise HTTPException(status_code=400, detail="Tienda no soportada")
-
+# 🧪 /SELECTORS – Extrae texto desde selectores CSS (versión funcional universal)
+@app.post("/selectors")
+async def extract_selectors(request: SelectorRequest):
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
             page = await browser.new_page()
+            await page.goto(request.url, wait_until=request.wait_until, timeout=60000)
 
-            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-
-            # Esperar cada selector
-            for item in selectors:
+            # ✅ Esperar a que cada selector esté presente antes de capturar el contenido
+            for item in request.selectors:
                 try:
-                    await page.wait_for_selector(item["selector"], timeout=15000)
-                except:
-                    pass  # Si no aparece el selector, lo ignoramos
+                    await page.wait_for_selector(item.selector, timeout=15000)
+                except Exception:
+                    # Si no aparece, continuamos sin romper todo
+                    pass
 
-            html = await page.content()
+            content = await page.content()
             await browser.close()
 
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(content, "html.parser")
         results = {}
 
-        for item in selectors:
-            label = item["label"]
-            selector = item["selector"]
-            element = soup.select_one(selector)
+        for item in request.selectors:
+            label = item.label or item.selector
+            selected_element = soup.select_one(item.selector)
 
-            if element:
-                results[label] = element.get_text(strip=True)
+            if selected_element:
+                if item.attr:
+                    results[label] = selected_element.get(item.attr, "")
+                else:
+                    results[label] = selected_element.get_text(strip=True)
             else:
                 results[label] = ""
 
         return {
-            "url": url,
-            "resultados": results
+            "url": request.url,
+            "results": results
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/precios")
+async def precios(request: URLRequest):
+    url = request.url
 
+    if not url:
+        raise HTTPException(status_code=400, detail="La URL es requerida")
+
+    # 🌐 Detectar tienda según dominio y definir selectores
+    if "farmatodo" in url:
+        selectors = [
+            SelectorItem(label="precio_actual", selector="span.box__price--current"),
+            SelectorItem(label="precio_anterior", selector="span.box__price--before"),
+        ]
+    elif "cruzverde" in url:
+        selectors = [
+            SelectorItem(label="precio_actual", selector="span.font-bold.text-primary"),
+            SelectorItem(label="precio_anterior", selector="span.line-through.text-gray-500"),
+        ]
+    elif "tudrogueriavirtual" in url:
+        selectors = [
+            SelectorItem(label="precio_actual", selector="span.product-price"),
+            SelectorItem(label="precio_anterior", selector="span.old-price"),
+        ]
+    else:
+        raise HTTPException(status_code=400, detail="Tienda no soportada")
+
+    # 🧪 Reutilizar la lógica del endpoint /selectors
+    selector_request = SelectorRequest(
+        url=url,
+        wait_until="networkidle",
+        selectors=selectors
+    )
+
+    return await extract_selectors(selector_request)
+    
+
+class MultiURLRequest(BaseModel):
+    urls: List[str]
 
 
 
