@@ -16,6 +16,9 @@ app = FastAPI()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
 # 📥 MODELO DE ENTRADA
+class URLRequest(BaseModel):
+    url: str
+    wait_until: str = "domcontentloaded"
 
 class SelectorItem(BaseModel):
     selector: str
